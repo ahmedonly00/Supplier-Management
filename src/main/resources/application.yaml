@@ -1,0 +1,40 @@
+spring:
+  application:
+    name: Supplier-Mgt
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/supplier_db
+    username: postgres
+    password: REDACTED
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+
+  kafka:
+    bootstrap-servers: localhost:9092
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      properties:
+        spring.json.add.type.headers: false
+        max.block.ms: 5000
+
+server:
+  port: 8081
+
+kafka:
+  topic:
+    supplier: supplier-events
+
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operationsSorter: method
