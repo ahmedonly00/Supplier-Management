@@ -1,14 +1,15 @@
 package Supplier.Mgt.Supplier.Mgt.service;
 
-import Supplier.Mgt.Supplier.Mgt.dto.SupplierDto;
+import Supplier.Mgt.Supplier.Mgt.dto.SupplierRequest;
+import Supplier.Mgt.Supplier.Mgt.dto.SupplierResponse;
 
 public interface SupplierService {
 
-    SupplierDto.Response addSupplier(SupplierDto.Request request);
+    SupplierResponse addSupplier(SupplierRequest request);
 
-    SupplierDto.Response updateSupplier(Long id, SupplierDto.Request request);
+    SupplierResponse updateSupplier(Long id, SupplierRequest request);
 
-    SupplierDto.Response getSupplier(Long id);
+    SupplierResponse getSupplier(Long id);
 
     void deleteSupplier(Long id);
 }

@@ -230,8 +230,9 @@ src/main/java/Supplier/Mgt/Supplier/Mgt/
 ├── controller/
 │   └── SupplierController.java       # REST endpoints
 ├── dto/
-│   ├── ApiResponse.java              # Standard response envelope
-│   └── SupplierDto.java              # Request / Response nested classes
+│   ├── ApiResult.java                # Standard response envelope
+│   ├── SupplierRequest.java          # Request payload (create / update)
+│   └── SupplierResponse.java         # Response payload returned by the API
 ├── entity/
 │   ├── Supplier.java                 # JPA entity
 │   └── SupplierStatus.java           # ACTIVE | INACTIVE | SUSPENDED

@@ -1,6 +1,7 @@
 package Supplier.Mgt.Supplier.Mgt.serviceImpl;
 
-import Supplier.Mgt.Supplier.Mgt.dto.SupplierDto;
+import Supplier.Mgt.Supplier.Mgt.dto.SupplierRequest;
+import Supplier.Mgt.Supplier.Mgt.dto.SupplierResponse;
 import Supplier.Mgt.Supplier.Mgt.entity.Supplier;
 import Supplier.Mgt.Supplier.Mgt.event.SupplierEvent;
 import Supplier.Mgt.Supplier.Mgt.exception.DuplicateSupplierException;
@@ -21,128 +22,128 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class SupplierServiceImpl implements SupplierService {
 
-    private final SupplierRepository supplierRepository;
-    private final SupplierKafkaProducer kafkaProducer;
+        private final SupplierRepository supplierRepository;
+        private final SupplierKafkaProducer kafkaProducer;
 
-    @Override
-    @Transactional
-    public SupplierDto.Response addSupplier(SupplierDto.Request request) {
-        log.info("Adding new supplier with email: {}", request.getEmail());
+        @Override
+        @Transactional
+        public SupplierResponse addSupplier(SupplierRequest request) {
+                log.info("Adding new supplier with email: {}", request.getEmail());
 
-        if (supplierRepository.existsByEmail(request.getEmail())) {
-            throw new DuplicateSupplierException(request.getEmail());
+                if (supplierRepository.existsByEmail(request.getEmail())) {
+                        throw new DuplicateSupplierException(request.getEmail());
+                }
+
+                Supplier supplier = Supplier.builder()
+                                .name(request.getName())
+                                .email(request.getEmail())
+                                .phone(request.getPhone())
+                                .address(request.getAddress())
+                                .contactPerson(request.getContactPerson())
+                                .build();
+
+                Supplier saved = supplierRepository.save(supplier);
+                SupplierResponse response = toResponse(saved);
+
+                kafkaProducer.publishEvent(SupplierEvent.builder()
+                                .eventType("SUPPLIER_CREATED")
+                                .supplierId(saved.getId())
+                                .supplierName(saved.getName())
+                                .timestamp(LocalDateTime.now())
+                                .data(response)
+                                .build());
+
+                log.info("Supplier created with id: {}", saved.getId());
+                return response;
         }
 
-        Supplier supplier = Supplier.builder()
-                .name(request.getName())
-                .email(request.getEmail())
-                .phone(request.getPhone())
-                .address(request.getAddress())
-                .contactPerson(request.getContactPerson())
-                .build();
+        @Override
+        @Transactional
+        public SupplierResponse updateSupplier(Long id, SupplierRequest request) {
+                log.info("Updating supplier with id: {}", id);
 
-        Supplier saved = supplierRepository.save(supplier);
-        SupplierDto.Response response = toResponse(saved);
+                Supplier supplier = supplierRepository.findById(id)
+                                .orElseThrow(() -> new SupplierNotFoundException(id));
 
-        kafkaProducer.publishEvent(SupplierEvent.builder()
-                .eventType("SUPPLIER_CREATED")
-                .supplierId(saved.getId())
-                .supplierName(saved.getName())
-                .timestamp(LocalDateTime.now())
-                .data(response)
-                .build());
+                if (supplierRepository.existsByEmailAndIdNot(request.getEmail(), id)) {
+                        throw new DuplicateSupplierException(request.getEmail());
+                }
 
-        log.info("Supplier created with id: {}", saved.getId());
-        return response;
-    }
+                supplier.setName(request.getName());
+                supplier.setEmail(request.getEmail());
+                supplier.setPhone(request.getPhone());
+                supplier.setAddress(request.getAddress());
+                supplier.setContactPerson(request.getContactPerson());
+                supplier.setUpdatedAt(LocalDateTime.now());
 
-    @Override
-    @Transactional
-    public SupplierDto.Response updateSupplier(Long id, SupplierDto.Request request) {
-        log.info("Updating supplier with id: {}", id);
+                Supplier updated = supplierRepository.save(supplier);
+                SupplierResponse response = toResponse(updated);
 
-        Supplier supplier = supplierRepository.findById(id)
-                .orElseThrow(() -> new SupplierNotFoundException(id));
+                kafkaProducer.publishEvent(SupplierEvent.builder()
+                                .eventType("SUPPLIER_UPDATED")
+                                .supplierId(updated.getId())
+                                .supplierName(updated.getName())
+                                .timestamp(LocalDateTime.now())
+                                .data(response)
+                                .build());
 
-        if (supplierRepository.existsByEmailAndIdNot(request.getEmail(), id)) {
-            throw new DuplicateSupplierException(request.getEmail());
+                log.info("Supplier updated with id: {}", updated.getId());
+                return response;
         }
 
-        supplier.setName(request.getName());
-        supplier.setEmail(request.getEmail());
-        supplier.setPhone(request.getPhone());
-        supplier.setAddress(request.getAddress());
-        supplier.setContactPerson(request.getContactPerson());
-        supplier.setUpdatedAt(LocalDateTime.now());
+        @Override
+        @Transactional(readOnly = true)
+        public SupplierResponse getSupplier(Long id) {
+                log.info("Retrieving supplier with id: {}", id);
 
-        Supplier updated = supplierRepository.save(supplier);
-        SupplierDto.Response response = toResponse(updated);
+                Supplier supplier = supplierRepository.findById(id)
+                                .orElseThrow(() -> new SupplierNotFoundException(id));
 
-        kafkaProducer.publishEvent(SupplierEvent.builder()
-                .eventType("SUPPLIER_UPDATED")
-                .supplierId(updated.getId())
-                .supplierName(updated.getName())
-                .timestamp(LocalDateTime.now())
-                .data(response)
-                .build());
+                SupplierResponse response = toResponse(supplier);
 
-        log.info("Supplier updated with id: {}", updated.getId());
-        return response;
-    }
+                kafkaProducer.publishEvent(SupplierEvent.builder()
+                                .eventType("SUPPLIER_RETRIEVED")
+                                .supplierId(supplier.getId())
+                                .supplierName(supplier.getName())
+                                .timestamp(LocalDateTime.now())
+                                .data(response)
+                                .build());
 
-    @Override
-    @Transactional(readOnly = true)
-    public SupplierDto.Response getSupplier(Long id) {
-        log.info("Retrieving supplier with id: {}", id);
+                return response;
+        }
 
-        Supplier supplier = supplierRepository.findById(id)
-                .orElseThrow(() -> new SupplierNotFoundException(id));
+        @Override
+        @Transactional
+        public void deleteSupplier(Long id) {
+                log.info("Deleting supplier with id: {}", id);
 
-        SupplierDto.Response response = toResponse(supplier);
+                Supplier supplier = supplierRepository.findById(id)
+                                .orElseThrow(() -> new SupplierNotFoundException(id));
 
-        kafkaProducer.publishEvent(SupplierEvent.builder()
-                .eventType("SUPPLIER_RETRIEVED")
-                .supplierId(supplier.getId())
-                .supplierName(supplier.getName())
-                .timestamp(LocalDateTime.now())
-                .data(response)
-                .build());
+                supplierRepository.delete(supplier);
 
-        return response;
-    }
+                kafkaProducer.publishEvent(SupplierEvent.builder()
+                                .eventType("SUPPLIER_DELETED")
+                                .supplierId(supplier.getId())
+                                .supplierName(supplier.getName())
+                                .timestamp(LocalDateTime.now())
+                                .data(Map.of("id", id, "deletedAt", LocalDateTime.now().toString()))
+                                .build());
 
-    @Override
-    @Transactional
-    public void deleteSupplier(Long id) {
-        log.info("Deleting supplier with id: {}", id);
+                log.info("Supplier deleted with id: {}", id);
+        }
 
-        Supplier supplier = supplierRepository.findById(id)
-                .orElseThrow(() -> new SupplierNotFoundException(id));
-
-        supplierRepository.delete(supplier);
-
-        kafkaProducer.publishEvent(SupplierEvent.builder()
-                .eventType("SUPPLIER_DELETED")
-                .supplierId(supplier.getId())
-                .supplierName(supplier.getName())
-                .timestamp(LocalDateTime.now())
-                .data(Map.of("id", id, "deletedAt", LocalDateTime.now().toString()))
-                .build());
-
-        log.info("Supplier deleted with id: {}", id);
-    }
-
-    private SupplierDto.Response toResponse(Supplier supplier) {
-        return SupplierDto.Response.builder()
-                .id(supplier.getId())
-                .name(supplier.getName())
-                .email(supplier.getEmail())
-                .phone(supplier.getPhone())
-                .address(supplier.getAddress())
-                .contactPerson(supplier.getContactPerson())
-                .status(supplier.getStatus().name())
-                .createdAt(supplier.getCreatedAt())
-                .updatedAt(supplier.getUpdatedAt())
-                .build();
-    }
+        private SupplierResponse toResponse(Supplier supplier) {
+                return SupplierResponse.builder()
+                                .id(supplier.getId())
+                                .name(supplier.getName())
+                                .email(supplier.getEmail())
+                                .phone(supplier.getPhone())
+                                .address(supplier.getAddress())
+                                .contactPerson(supplier.getContactPerson())
+                                .status(supplier.getStatus().name())
+                                .createdAt(supplier.getCreatedAt())
+                                .updatedAt(supplier.getUpdatedAt())
+                                .build();
+        }
 }
